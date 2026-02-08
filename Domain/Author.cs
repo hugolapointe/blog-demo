@@ -1,22 +1,29 @@
 namespace BlogDemo.Domain;
 
+// [DDD] Aggregate Root - Un auteur peut publier plusieurs articles
 public class Author {
-    // Clé primaire avec protected set pour empêcher modification externe
-    public Guid Id { get; protected set; } = Guid.NewGuid();
+    // === IDENTITÉ ===
+    // [Bonne Pratique] protected set empêche la modification de l'Id
+    public Guid Id { get; protected set; }
 
-    // required (C# 11) force l'initialisation de cette propriété
+    // === PROPRIÉTÉS MÉTIER ===
     public required string Name { get; set; }
 
-    // virtual requis pour lazy loading proxies d'EF Core
-    // [] (C# 12) initialise une collection vide (équivalent à new List<Article>())
+    // === NAVIGATION PROPERTIES ===
+    // [EF Core] virtual requis pour le lazy loading
     public virtual ICollection<Article> Articles { get; set; } = [];
 
-    // Constructeur protected requis par EF Core pour créer les entités
+    // === CONSTRUCTEUR ===
+    // [EF Core] Constructeur sans paramètre requis
     protected Author() { }
 
-    // Méthode factory pour créer des entités dans un état valide
+    // === FACTORY METHOD ===
+    // [Bonne Pratique] Garantit un état valide
     public static Author Create(string name) {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+
         return new Author {
+            Id = Guid.NewGuid(),
             Name = name
         };
     }

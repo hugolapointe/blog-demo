@@ -133,31 +133,58 @@ Le projet est organisé pour un apprentissage progressif :
 
 ```csharp
 public class Entity {
-    // Clé primaire - protected set empêche modification externe
-    public Guid Id { get; protected set; } = Guid.NewGuid();
+    // [EF Core] Clé primaire - protected set empêche modification externe
+    public Guid Id { get; protected set; }
 
     // required (C# 11) - force initialisation à la création
     public required string Property { get; set; }
 
-    // Clé étrangère - protected set (modifiée via factory uniquement)
+    // Clé étrangère - protected set (immutable après création)
     public Guid ForeignKeyId { get; protected set; }
 
-    // Navigation property - virtual requis pour lazy loading proxies
+    // [EF Core] Navigation property - virtual REQUIS pour lazy loading proxies
     // ? indique nullable (avant chargement)
     public virtual RelatedEntity? Related { get; set; }
 
     // Collection - [] (C# 12) équivalent à new List<>()
     public virtual ICollection<Entity> Collection { get; set; } = [];
 
-    // Constructeur protected - requis par EF Core
+    // [EF Core] Constructeur sans paramètre REQUIS pour la création depuis la BD
     protected Entity() { }
 
-    // Méthode factory - garantit état valide à la création
+    // Factory method - garantit état valide à la création
     public static Entity Create(string property, Guid foreignKeyId) {
-        return new Entity { Property = property, ForeignKeyId = foreignKeyId };
+        ArgumentException.ThrowIfNullOrWhiteSpace(property);
+        ArgumentOutOfRangeException.ThrowIfEqual(foreignKeyId, Guid.Empty);
+
+        return new Entity {
+            Id = Guid.NewGuid(),
+            Property = property,
+            ForeignKeyId = foreignKeyId
+        };
     }
 }
 ```
+
+### Association d'Entités
+
+**Règle:** Préférer les FK par défaut, utiliser les navigation properties si l'entité est déjà chargée.
+
+```csharp
+// ✅ BON: Par FK (pas de chargement inutile)
+var comment = Comment.Create(content, articleId);
+context.Comments.Add(comment);
+
+// ✅ BON: Par navigation si déjà chargé
+var article = await context.Articles.Include(a => a.Comments).FirstAsync();
+article.AddComment(comment);  // Méthode de domaine
+```
+
+| Approche | Quand utiliser | Avantage |
+|----------|----------------|----------|
+| **Par FK** | Création, API endpoints | Pas de requête pour charger l'entité parente |
+| **Par Navigation** | Entité déjà en mémoire | Évite requête supplémentaire |
+| **Relations N-N** | Tags, catégories | EF Core gère la table de jointure automatiquement |
 
 ### Stratégies de Chargement
 

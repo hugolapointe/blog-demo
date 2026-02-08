@@ -1,24 +1,31 @@
 namespace BlogDemo.Domain;
 
+// [DDD] Entité enfant de l'aggregate Article (ne peut exister indépendamment)
 public class Comment {
-    // Clé primaire avec protected set pour empêcher modification externe
-    public Guid Id { get; protected set; } = Guid.NewGuid();
+    // === IDENTITÉ ===
+    // [Bonne Pratique] protected set empêche la modification de l'Id
+    public Guid Id { get; protected set; }
 
-    // required (C# 11) force l'initialisation
+    // === PROPRIÉTÉS MÉTIER ===
     public required string Content { get; set; }
 
-    // Clé étrangère avec protected set (modifiée uniquement via factory)
+    // === CLÉS ÉTRANGÈRES ===
+    // [Bonne Pratique] protected set garantit l'immutabilité
     public Guid ArticleId { get; protected set; }
 
-    // Navigation property virtual pour lazy loading
+    // === NAVIGATION PROPERTIES ===
+    // [EF Core] virtual requis pour le lazy loading
     public virtual Article? Article { get; set; }
 
-    // Constructeur protected requis par EF Core
+    // === CONSTRUCTEUR ===
+    // [EF Core] Constructeur sans paramètre requis
     protected Comment() { }
 
-    // Méthode factory garantit que ArticleId est défini à la création
-    public static Comment Create(string content, Guid articleId) {
+    // === FACTORY METHOD (INTERNE) ===
+    // [DDD] Utilisé uniquement par l'aggregate root Article
+    internal static Comment CreateInternal(string content, Guid articleId) {
         return new Comment {
+            Id = Guid.NewGuid(),
             Content = content,
             ArticleId = articleId
         };

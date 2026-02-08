@@ -27,10 +27,11 @@ await BlogSeeder.SeedAsync(context);
 context.ChangeTracker.Clear();
 
 // Démonstrations
-await new BasicOperationsDemo(context).RunAsync();
-await new LoadingStrategiesDemo(context).RunAsync();
-await new PerformanceOptimizationDemo(context).RunAsync();
-await new QueryingDemo(context).RunAsync();
-await new AggregationDemo(context).RunAsync();
+await new BasicOperationsDemo(context).ResetAndExecuteAll();
+await new LoadingStrategiesDemo(context).ResetAndExecuteAll();
+await new OptimizationDemo(context).ResetAndExecuteAll();
+await new QueryingDemo(context).ResetAndExecuteAll();
+await new AggregationDemo(context).ResetAndExecuteAll();
+await DeleteBehaviorDemo.Run(context);
 
 Console.WriteLine("\n=== Fin ===");

@@ -4,36 +4,27 @@ using Microsoft.EntityFrameworkCore;
 namespace BlogDemo.Demos;
 
 public class AggregationDemo(BlogDbContext context) : DemoBase(context) {
-    protected override async Task ExecuteAsync() {
-        WriteTitle("=== AGGREGATION ===");
-
+    protected override async Task ExecuteAll() {
         await BasicAggregationsAsync();
         await GroupByAsync();
         await GroupByWithHavingAsync();
     }
 
     async Task BasicAggregationsAsync() {
-        WriteTitle("--- Agrégations de base ---");
 
-        // Count, Sum, Average, Max, Min s'exécutent côté SQL
+        // Agrégations exécutées côté SQL (pas en mémoire)
+        // Count, Sum, Average, Max, Min retournent une valeur scalaire
         var totalArticles = await Context.Articles.CountAsync();
-        var totalComments = await Context.Comments.CountAsync();
-        var avgCommentsPerArticle = totalComments / (double)totalArticles;
+        var totalAuthors = await Context.Authors.CountAsync();
+        var avgArticlesPerAuthor = totalArticles / (double)totalAuthors;
 
-        Console.WriteLine($"Total articles: {totalArticles}");
-        Console.WriteLine($"Total comments: {totalComments}");
-        Console.WriteLine($"Moyenne comments/article: {avgCommentsPerArticle:F1}");
-
-        // Avec Select() pour calculer en SQL
+        // Combiner Select() et agrégations pour calculs complexes
         var maxCommentCount = await Context.Articles
             .Select(article => article.Comments.Count)
             .MaxAsync();
-
-        Console.WriteLine($"Max comments sur un article: {maxCommentCount}");
     }
 
     async Task GroupByAsync() {
-        WriteTitle("--- GroupBy (Regroupement) ---");
 
         // GroupBy() regroupe les données et permet des agrégations par groupe
         // SQL: SELECT AuthorId, COUNT(*) FROM Articles GROUP BY AuthorId
@@ -45,18 +36,13 @@ public class AggregationDemo(BlogDbContext context) : DemoBase(context) {
                 TotalComments = group.Sum(article => article.Comments.Count)
             })
             .ToListAsync();
-
-        Console.WriteLine("Articles par auteur:");
-        foreach (var stats in articlesByAuthor) {
-            Console.WriteLine($"  {stats.AuthorName}: {stats.ArticleCount} articles, {stats.TotalComments} comments");
-        }
     }
 
     async Task GroupByWithHavingAsync() {
-        WriteTitle("--- GroupBy + Having (Filtrer les groupes) ---");
 
-        // Where() avant GroupBy() = filtrer les lignes
-        // Where() après GroupBy() = filtrer les groupes (HAVING en SQL)
+        // Distinction importante :
+        // Where() AVANT GroupBy() → filtre les lignes (WHERE en SQL)
+        // Where() APRÈS GroupBy() → filtre les groupes (HAVING en SQL)
         var authorsWithMultipleArticles = await Context.Articles
             .GroupBy(article => article.Author!.Name)
             .Where(group => group.Count() > 1)  // HAVING COUNT(*) > 1
@@ -65,10 +51,5 @@ public class AggregationDemo(BlogDbContext context) : DemoBase(context) {
                 ArticleCount = group.Count()
             })
             .ToListAsync();
-
-        Console.WriteLine("Auteurs avec plusieurs articles:");
-        foreach (var stats in authorsWithMultipleArticles) {
-            Console.WriteLine($"  {stats.AuthorName}: {stats.ArticleCount} articles");
-        }
     }
 }
