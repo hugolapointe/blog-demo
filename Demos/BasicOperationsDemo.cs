@@ -7,63 +7,63 @@ using System.Diagnostics;
 
 namespace BlogDemo.Demos;
 
-public class BasicOperationsDemo(BlogDbContext context) : DemoBase(context) {
-    protected override async Task ExecuteAll() {
-        await AddEntityAsync();
-        await UpdateEntityAsync();
-        await DeleteEntityAsync();
-        await EntityStatesAsync();
+public static class BasicOperationsDemo {
+    public static async Task RunAsync(BlogDbContext context) {
+        await AddEntityAsync(context);
+        await UpdateEntityAsync(context);
+        await DeleteEntityAsync(context);
+        await EntityStatesAsync(context);
     }
 
     // [CREATE] Ajouter une entité via Factory Method + Add + SaveChanges
-    async Task AddEntityAsync() {
+    static async Task AddEntityAsync(BlogDbContext context) {
         var newAuthor = Author.Create("Charlie Leclerc");
-        Context.Authors.Add(newAuthor);
-        await Context.SaveChangesAsync();
+        context.Authors.Add(newAuthor);
+        await context.SaveChangesAsync();
 
-        var found = await Context.Authors.FindAsync(newAuthor.Id);
+        var found = await context.Authors.FindAsync(newAuthor.Id);
         Debug.Assert(found != null);
         Debug.Assert(found.Name == "Charlie Leclerc");
     }
 
     // [UPDATE] Modifier une propriété d'une entité trackée → détection automatique
-    async Task UpdateEntityAsync() {
-        var author = await Context.Authors.FirstAsync(a => a.Name == "Charlie Leclerc");
+    static async Task UpdateEntityAsync(BlogDbContext context) {
+        var author = await context.Authors.FirstAsync(a => a.Name == "Charlie Leclerc");
         author.Name = "Charles Leclerc";
-        await Context.SaveChangesAsync();
+        await context.SaveChangesAsync();
 
-        Context.ChangeTracker.Clear();
-        var updated = await Context.Authors.FirstAsync(a => a.Id == author.Id);
+        context.ChangeTracker.Clear();
+        var updated = await context.Authors.FirstAsync(a => a.Id == author.Id);
         Debug.Assert(updated.Name == "Charles Leclerc");
     }
 
     // [DELETE] Charger puis supprimer avec Remove + SaveChanges
-    async Task DeleteEntityAsync() {
-        var author = await Context.Authors.FirstAsync(a => a.Name == "Charles Leclerc");
-        Context.Authors.Remove(author);
-        await Context.SaveChangesAsync();
+    static async Task DeleteEntityAsync(BlogDbContext context) {
+        var author = await context.Authors.FirstAsync(a => a.Name == "Charles Leclerc");
+        context.Authors.Remove(author);
+        await context.SaveChangesAsync();
 
-        var exists = await Context.Authors.AnyAsync(a => a.Name == "Charles Leclerc");
+        var exists = await context.Authors.AnyAsync(a => a.Name == "Charles Leclerc");
         Debug.Assert(!exists);
     }
 
     // [ENTITY STATES] Cycle de vie : Detached → Added → Unchanged → Modified → Deleted
-    async Task EntityStatesAsync() {
+    static async Task EntityStatesAsync(BlogDbContext context) {
         var author = Author.Create("David Martin");
-        Debug.Assert(Context.Entry(author).State == EntityState.Detached);
+        Debug.Assert(context.Entry(author).State == EntityState.Detached);
 
-        Context.Authors.Add(author);
-        Debug.Assert(Context.Entry(author).State == EntityState.Added);
+        context.Authors.Add(author);
+        Debug.Assert(context.Entry(author).State == EntityState.Added);
 
-        await Context.SaveChangesAsync();
-        Debug.Assert(Context.Entry(author).State == EntityState.Unchanged);
+        await context.SaveChangesAsync();
+        Debug.Assert(context.Entry(author).State == EntityState.Unchanged);
 
         author.Name = "David Dupont";
-        Debug.Assert(Context.Entry(author).State == EntityState.Modified);
+        Debug.Assert(context.Entry(author).State == EntityState.Modified);
 
-        Context.Authors.Remove(author);
-        Debug.Assert(Context.Entry(author).State == EntityState.Deleted);
+        context.Authors.Remove(author);
+        Debug.Assert(context.Entry(author).State == EntityState.Deleted);
 
-        await Context.SaveChangesAsync();
+        await context.SaveChangesAsync();
     }
 }

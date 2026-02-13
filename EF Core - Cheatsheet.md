@@ -1,7 +1,7 @@
 # Cheatsheet - Entity Framework Core
 
 **Projet:** BlogDemo - Application de démonstration pédagogique
-**Voir:** `Data/BlogDbContext.cs`, `Data/BlogSeeder.cs`, `Demos/BasicOperationsDemo.cs`, `Demos/LoadingStrategiesDemo.cs`, `Demos/OptimizationDemo.cs`, `Demos/DeleteBehaviorDemo.cs`
+**Voir:** `Data/BlogDbContext.cs`, `Data/BlogSeeder.cs`, `Demos/BasicOperationsDemo.cs`, `Demos/LoadingStrategiesDemo.cs`, `Demos/OptimizationDemo.cs`
 
 > Référence rapide pour EF Core - Architecture, configuration, CRUD, chargement, optimisations
 
@@ -240,50 +240,54 @@ Cycle de vie typique : `Detached` → `Added` → `Unchanged` → `Modified` →
 
 **Voir:** `Demos/LoadingStrategiesDemo.cs`
 
+> **Important :** EF Core ne charge pas automatiquement les relations (navigation properties). Sans configuration, accéder à une navigation property retourne `null` ou une collection vide. Il faut charger explicitement les relations avec `Include()` (eager) ou `Entry().LoadAsync()` (explicit).
+
 ### Comparaison
 
-| Stratégie | Quand | Requêtes | Prérequis |
-|-----------|-------|----------|-----------|
-| **Lazy Loading** | Accès occasionnel | N+1 | `UseLazyLoadingProxies()` + `virtual` |
-| **Eager Loading** | Données toujours nécessaires | 1 (JOIN) | `Include()` |
-| **Explicit Loading** | Chargement conditionnel | Sur demande | `Entry().LoadAsync()` |
+| Stratégie | Quand | Requêtes | Prérequis | Recommandation |
+|-----------|-------|----------|-----------|----------------|
+| **Eager Loading** | Données toujours nécessaires | 1 (JOIN) | `Include()` | Recommandé par défaut |
+| **Explicit Loading** | Chargement conditionnel | Sur demande | `Entry().LoadAsync()` | Alternative à Eager |
+| **Lazy Loading** | — | N+1 | `UseLazyLoadingProxies()` + `virtual` | Non recommandé |
 
-### Lazy Loading
+### Eager Loading (Include) — Recommandé
 
-Requiert des proprietes `virtual` et `UseLazyLoadingProxies()`. L'acces a une navigation property declenche automatiquement une requete SQL.
-
-```csharp
-var article = await context.Articles.FirstAsync();
-var name = article.Author.Name;
-```
-
-**Problème N+1** — Voir: `Demos/LoadingStrategiesDemo.cs` méthode `ProblemN1Async`
-
-Chaque iteration declenche une requete supplementaire pour Author (1 + N requetes au total).
-
-```csharp
-var articles = await context.Articles.ToListAsync();
-foreach (var a in articles)
-    Console.WriteLine(a.Author.Name);
-```
-
-### Eager Loading (Include)
-
-Une relation directe avec `Include`, ou imbriquee avec `ThenInclude`.
+Stratégie à privilégier. `Include()` charge les relations via JOIN en une seule requête. `ThenInclude()` pour les relations imbriquées.
 
 ```csharp
 .Include(a => a.Author)
 .Include(a => a.Comments).ThenInclude(c => c.Article)
 ```
 
-### Explicit Loading
+### Explicit Loading — Alternative à Eager
 
-`Reference()` pour les relations 1-1 ou N-1, `Collection()` pour les relations 1-N.
+À utiliser quand Eager Loading n'est pas approprié (chargement conditionnel, logique métier). `Reference()` pour les relations N-1, `Collection()` pour les relations 1-N.
+
+Sans `Include()` ni Lazy Loading, les relations ne sont pas chargées — il faut les charger explicitement via `Entry().LoadAsync()`.
 
 ```csharp
 var article = await context.Articles.FirstAsync();
 await context.Entry(article).Reference(a => a.Author).LoadAsync();
 await context.Entry(article).Collection(a => a.Comments).LoadAsync();
+```
+
+### Lazy Loading — Non recommandé
+
+Requiert un opt-in explicite : propriétés `virtual` et `UseLazyLoadingProxies()`. L'accès à une navigation property déclenche automatiquement une requête SQL, de façon transparente. Cette transparence fait perdre le contrôle sur le nombre et le moment des accès à la BD. Préférer Eager ou Explicit Loading.
+
+```csharp
+var article = await context.Articles.FirstAsync();
+var name = article.Author.Name; // Requête SQL invisible
+```
+
+**Problème N+1** — Voir: `Demos/LoadingStrategiesDemo.cs` méthode `ProblemN1Async`
+
+Chaque itération déclenche une requête supplémentaire pour Author (1 + N requêtes au total).
+
+```csharp
+var articles = await context.Articles.ToListAsync();
+foreach (var a in articles)
+    Console.WriteLine(a.Author.Name); // N requêtes invisibles
 ```
 
 ---
@@ -393,7 +397,6 @@ Index simple, composite (plusieurs colonnes) et unique.
 | `NoAction` | Aucune action (erreur BD possible) |
 
 **Voir:** `Data/BlogDbContext.cs` — `DeleteBehavior.Restrict` sur Author → Articles
-**Voir:** `Demos/DeleteBehaviorDemo.cs` — démonstration Restrict et Cascade
 
 ---
 
@@ -467,7 +470,7 @@ context.ChangeTracker.Clear()
 
 Verifier l'etat, forcer un etat manuellement, ou vider le cache du tracker.
 
-**Voir:** `Demos/DemoBase.cs` — `ChangeTracker.Clear()` utilisé entre chaque démo
+**Voir:** `Program.cs` — `ChangeTracker.Clear()` utilisé entre chaque démo via `RunDemo()`
 
 ---
 
@@ -502,8 +505,9 @@ Activer le logging SQL et surveiller :
 
 ### A Faire
 
+- `Include()` pour éviter le problème N+1 (stratégie de chargement recommandée)
+- `Entry().LoadAsync()` quand Eager Loading n'est pas approprié (chargement conditionnel)
 - `AsNoTracking()` pour les lectures seules
-- `Include()` pour éviter le problème N+1
 - `Select()` pour charger uniquement les colonnes nécessaires
 - `AsSplitQuery()` avec multiples Include sur des collections
 - `async/await` pour toutes les opérations BD
@@ -512,7 +516,8 @@ Activer le logging SQL et surveiller :
 
 ### A Éviter
 
-- Lazy loading dans une boucle (N+1)
+- Lazy loading — requêtes transparentes qui font perdre le contrôle sur les accès BD
+- Lazy loading dans une boucle (problème N+1)
 - `ToList()` puis filtrer en mémoire
 - Méthodes synchrones (`ToList()` au lieu de `ToListAsync()`)
 - Créer un DbContext par itération dans une boucle

@@ -108,14 +108,6 @@ Le projet est organisé pour un apprentissage progressif :
 
 ---
 
-### 6. Delete Behavior - Comportements de suppression
-
-**Fichier :** `Demos/DeleteBehaviorDemo.cs`
-
-**Concepts démontrés :**
-- **Restrict** - `OnDelete(DeleteBehavior.Restrict)` empêche la suppression d'un parent avec enfants
-- **Cascade** - Suppression automatique des enfants (comportement par défaut)
-
 ---
 
 ## Cheatsheets

@@ -5,25 +5,32 @@ using System.Diagnostics;
 
 namespace BlogDemo.Demos;
 
-public class AggregationDemo(BlogDbContext context) : DemoBase(context) {
-    protected override async Task ExecuteAll() {
-        await BasicAggregationsAsync();
-        await GroupByAsync();
-        await GroupByWithHavingAsync();
+public static class AggregationDemo {
+    public static async Task RunAsync(BlogDbContext context) {
+        await BasicAggregationsAsync(context);
+        await GroupByAsync(context);
+        await GroupByWithHavingAsync(context);
     }
 
     // [AGRÉGATIONS] Count, Sum, Average, Max, Min → valeurs scalaires côté SQL
-    async Task BasicAggregationsAsync() {
-        var totalArticles = await Context.Articles.CountAsync();
-        var totalAuthors = await Context.Authors.CountAsync();
-        var avgArticlesPerAuthor = totalArticles / (double)totalAuthors;
+    static async Task BasicAggregationsAsync(BlogDbContext context) {
+        var totalArticles = await context.Articles.CountAsync();
+        var totalAuthors = await context.Authors.CountAsync();
 
-        Debug.Assert(totalArticles == 3);
-        Debug.Assert(totalAuthors == 2);
+        // À NE PAS FAIRE : calculer la moyenne manuellement en C# (2 requêtes + calcul côté client)
+        var avgManual = totalArticles / (double)totalAuthors;
+        Debug.Assert(avgManual == 1.5);
+
+        // BONNE PRATIQUE : AverageAsync() délègue le calcul au moteur SQL (fonction AVG)
+        // Une seule requête, le calcul est fait côté serveur
+        var avgArticlesPerAuthor = await context.Authors
+            .Select(a => (double)a.Articles.Count)
+            .AverageAsync();
+
         Debug.Assert(avgArticlesPerAuthor == 1.5);
 
-        // Select() + agrégation pour calculs complexes
-        var maxCommentCount = await Context.Articles
+        // MaxAsync() côté SQL — évite de charger toutes les entités pour trouver le max
+        var maxCommentCount = await context.Articles
             .Select(article => article.Comments.Count)
             .MaxAsync();
 
@@ -32,8 +39,8 @@ public class AggregationDemo(BlogDbContext context) : DemoBase(context) {
 
     // [GROUP BY] Regrouper par critère et agréger
     // SQL: SELECT AuthorName, COUNT(*), SUM(...) FROM Articles GROUP BY AuthorName
-    async Task GroupByAsync() {
-        var articlesByAuthor = await Context.Articles
+    static async Task GroupByAsync(BlogDbContext context) {
+        var articlesByAuthor = await context.Articles
             .GroupBy(article => article.Author!.Name)
             .Select(group => new {
                 AuthorName = group.Key,
@@ -51,8 +58,8 @@ public class AggregationDemo(BlogDbContext context) : DemoBase(context) {
 
     // [HAVING] Where() APRÈS GroupBy() → filtre les groupes (HAVING en SQL)
     // Where() AVANT GroupBy() → filtre les lignes (WHERE en SQL)
-    async Task GroupByWithHavingAsync() {
-        var authorsWithMultipleArticles = await Context.Articles
+    static async Task GroupByWithHavingAsync(BlogDbContext context) {
+        var authorsWithMultipleArticles = await context.Articles
             .GroupBy(article => article.Author!.Name)
             .Where(group => group.Count() > 1)
             .Select(group => new {

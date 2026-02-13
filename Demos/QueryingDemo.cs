@@ -7,22 +7,23 @@ using System.Diagnostics;
 
 namespace BlogDemo.Demos;
 
-public class QueryingDemo(BlogDbContext context) : DemoBase(context) {
-    protected override async Task ExecuteAll() {
-        await FilteringAsync();
-        await SortingAsync();
-        await PaginationAsync();
-        await FirstVsSingleAsync();
-        await AnyVsCountAsync();
-        await DistinctAsync();
-        await ContainsAsync();
-        await AsQueryableAsync();
-        await CombinedAsync();
+public static class QueryingDemo {
+    public static async Task RunAsync(BlogDbContext context) {
+        await FilteringAsync(context);
+        await SortingAsync(context);
+        await PaginationAsync(context);
+        await FindByIdAsync(context);
+        await FirstVsSingleAsync(context);
+        await AnyVsCountAsync(context);
+        await DistinctAsync(context);
+        await ContainsAsync(context);
+        await AsQueryableAsync(context);
+        await CombinedAsync(context);
     }
 
     // [FILTRAGE] Where() → SQL WHERE
-    async Task FilteringAsync() {
-        var articles = await Context.Articles
+    static async Task FilteringAsync(BlogDbContext context) {
+        var articles = await context.Articles
             .Where(a => a.Title.Contains("EF Core"))
             .ToListAsync();
 
@@ -32,8 +33,8 @@ public class QueryingDemo(BlogDbContext context) : DemoBase(context) {
 
     // [TRI] OrderBy + ThenBy → SQL ORDER BY
     // Piège : OrderBy() remplace le tri précédent, utiliser ThenBy()
-    async Task SortingAsync() {
-        var articles = await Context.Articles
+    static async Task SortingAsync(BlogDbContext context) {
+        var articles = await context.Articles
             .OrderByDescending(a => a.CreatedAt)
             .ThenBy(a => a.Title)
             .ToListAsync();
@@ -43,56 +44,74 @@ public class QueryingDemo(BlogDbContext context) : DemoBase(context) {
 
     // [PAGINATION] Skip + Take → SQL OFFSET/FETCH
     // OrderBy est OBLIGATOIRE avant Skip/Take
-    async Task PaginationAsync() {
+    static async Task PaginationAsync(BlogDbContext context) {
         int pageSize = 2;
         int pageNumber = 1;
 
-        var articles = await Context.Articles
+        var articles = await context.Articles
             .OrderBy(a => a.Title)
             .Skip(pageNumber * pageSize)
             .Take(pageSize)
             .ToListAsync();
 
-        var totalCount = await Context.Articles.CountAsync();
+        var totalCount = await context.Articles.CountAsync();
 
         Debug.Assert(articles.Count <= pageSize);
         Debug.Assert(totalCount == 3);
+    }
+
+    // [FIND] FindAsync() recherche par clé primaire — optimisé car vérifie le cache local avant la BD
+    // À privilégier quand on cherche par Id, car évite une requête SQL si l'entité est déjà trackée
+    static async Task FindByIdAsync(BlogDbContext context) {
+        var article = await context.Articles.FirstAsync();
+        var articleId = article.Id;
+
+        // FindAsync vérifie d'abord le ChangeTracker → pas de requête SQL si déjà en mémoire
+        var cached = await context.Articles.FindAsync(articleId);
+        Debug.Assert(cached != null);
+        Debug.Assert(ReferenceEquals(article, cached)); // Même instance, pas de requête
+
+        context.ChangeTracker.Clear();
+
+        // Après Clear(), l'entité n'est plus en cache → FindAsync fait une requête SQL
+        var fromDb = await context.Articles.FindAsync(articleId);
+        Debug.Assert(fromDb != null);
+        Debug.Assert(!ReferenceEquals(article, fromDb)); // Nouvelle instance, requête SQL
     }
 
     // [FIRST vs SINGLE]
     // First() → premier élément (exception si vide)
     // FirstOrDefault() → premier ou null
     // Single() → un seul élément attendu (exception si 0 ou >1)
-    async Task FirstVsSingleAsync() {
-        var first = await Context.Articles.FirstAsync();
+    static async Task FirstVsSingleAsync(BlogDbContext context) {
+        var first = await context.Articles.FirstAsync();
         Debug.Assert(first != null);
 
-        var firstOrNull = await Context.Articles
+        var firstOrNull = await context.Articles
             .FirstOrDefaultAsync(a => a.Title == "Inexistant");
         Debug.Assert(firstOrNull == null);
 
-        var single = await Context.Articles
+        var single = await context.Articles
             .SingleAsync(a => a.Title == "Introduction à EF Core");
         Debug.Assert(single.Title == "Introduction à EF Core");
     }
 
-    // [ANY vs COUNT]
-    // Any() s'arrête au premier résultat (rapide)
-    // Count() parcourt tout (plus lent)
-    // Bonne pratique : utiliser Any() au lieu de Count() > 0
-    async Task AnyVsCountAsync() {
-        var count = await Context.Articles
-            .CountAsync(a => a.Title.Contains("EF Core"));
-        Debug.Assert(count >= 1);
+    // [ANY vs COUNT] Pour vérifier l'existence d'un élément
+    static async Task AnyVsCountAsync(BlogDbContext context) {
+        // À NE PAS FAIRE : Count() parcourt TOUS les résultats pour vérifier l'existence
+        var existsViaBadWay = await context.Articles
+            .CountAsync(a => a.Title.Contains("EF Core")) > 0;
+        Debug.Assert(existsViaBadWay);
 
-        var exists = await Context.Articles
+        // BONNE PRATIQUE : Any() s'arrête dès le premier résultat trouvé (SQL EXISTS)
+        var exists = await context.Articles
             .AnyAsync(a => a.Title.Contains("EF Core"));
         Debug.Assert(exists);
     }
 
     // [DISTINCT] Éliminer les doublons → SQL DISTINCT
-    async Task DistinctAsync() {
-        var authorNames = await Context.Articles
+    static async Task DistinctAsync(BlogDbContext context) {
+        var authorNames = await context.Articles
             .Select(a => a.Author!.Name)
             .Distinct()
             .ToListAsync();
@@ -101,9 +120,9 @@ public class QueryingDemo(BlogDbContext context) : DemoBase(context) {
     }
 
     // [CONTAINS] Liste.Contains() → SQL IN
-    async Task ContainsAsync() {
+    static async Task ContainsAsync(BlogDbContext context) {
         var targetAuthors = new[] { "Alice Dupont", "Bob Martin" };
-        var articles = await Context.Articles
+        var articles = await context.Articles
             .Where(a => targetAuthors.Contains(a.Author!.Name))
             .ToListAsync();
 
@@ -113,16 +132,16 @@ public class QueryingDemo(BlogDbContext context) : DemoBase(context) {
     // [IQUERYABLE] Construction dynamique de requêtes (exécution différée)
     // Anti-pattern : ToList() puis filtrer en mémoire
     // Bonne pratique : construire la requête IQueryable, puis matérialiser
-    async Task AsQueryableAsync() {
+    static async Task AsQueryableAsync(BlogDbContext context) {
         // Anti-pattern : tout charger puis filtrer en C#
-        var allArticles = await Context.Articles.ToListAsync();
+        var allArticles = await context.Articles.ToListAsync();
         var filteredInMemory = allArticles.Where(a => a.Title.Contains("EF Core"));
         Debug.Assert(filteredInMemory.Any());
 
-        Context.ChangeTracker.Clear();
+        context.ChangeTracker.Clear();
 
         // Bonne pratique : construire la requête SQL dynamiquement
-        IQueryable<Article> query = Context.Articles;
+        IQueryable<Article> query = context.Articles;
 
         string? searchTerm = "EF Core";
         if (!string.IsNullOrEmpty(searchTerm))
@@ -133,8 +152,8 @@ public class QueryingDemo(BlogDbContext context) : DemoBase(context) {
     }
 
     // [COMBINÉ] Ordre typique : Include → Where → OrderBy → Skip → Take
-    async Task CombinedAsync() {
-        var articles = await Context.Articles
+    static async Task CombinedAsync(BlogDbContext context) {
+        var articles = await context.Articles
             .Include(a => a.Author)
             .Where(a => a.Author!.Name.StartsWith("Alice"))
             .OrderByDescending(a => a.CreatedAt)
@@ -145,7 +164,7 @@ public class QueryingDemo(BlogDbContext context) : DemoBase(context) {
         Debug.Assert(articles.Count <= 2);
         Debug.Assert(articles.All(a => a.Author!.Name.StartsWith("Alice")));
 
-        var totalCount = await Context.Articles
+        var totalCount = await context.Articles
             .Where(a => a.Author!.Name.StartsWith("Alice"))
             .CountAsync();
         Debug.Assert(totalCount == 2);

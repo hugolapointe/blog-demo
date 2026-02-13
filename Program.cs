@@ -19,12 +19,16 @@ await context.Database.EnsureCreatedAsync();
 
 // Seed
 await BlogSeeder.SeedAsync(context);
-context.ChangeTracker.Clear();
+
+await RunDemo(BasicOperationsDemo.RunAsync);
+await RunDemo(LoadingStrategiesDemo.RunAsync);
+await RunDemo(OptimizationDemo.RunAsync);
+await RunDemo(QueryingDemo.RunAsync);
+await RunDemo(AggregationDemo.RunAsync);
 
 // Démonstrations
-await new BasicOperationsDemo(context).ResetAndExecuteAll();
-await new LoadingStrategiesDemo(context).ResetAndExecuteAll();
-await new OptimizationDemo(context).ResetAndExecuteAll();
-await new QueryingDemo(context).ResetAndExecuteAll();
-await new AggregationDemo(context).ResetAndExecuteAll();
-await DeleteBehaviorDemo.Run(context);
+// RunDemo() nettoie le ChangeTracker avant chaque démo pour éviter les interférences
+async Task RunDemo(Func<BlogDbContext, Task> demo) {
+    context.ChangeTracker.Clear();
+    await demo(context);
+}
