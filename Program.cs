@@ -3,21 +3,23 @@ using BlogDemo.Demos;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
-// Configuration du DbContext avec SQLite InMemory et logging SQL
+// Configuration du DbContext avec SQLite InMemory pour faciliter l'exécution des démos sans installation préalable
 var optionsBuilder = new DbContextOptionsBuilder<BlogDbContext>();
 optionsBuilder
     .UseSqlite("DataSource=:memory:")
-    .UseLazyLoadingProxies()
-    .LogTo(Console.WriteLine, LogLevel.Information)
-    .EnableSensitiveDataLogging();
+    .UseLazyLoadingProxies() // Active le chargement paresseux via des proxies dynamiques
+    .LogTo(Console.WriteLine, LogLevel.Information) // Affiche les requêtes SQL générées dans la console
+    .EnableSensitiveDataLogging(); // Inclut les valeurs des paramètres dans les logs (DANGER en production)
 
 using var context = new BlogDbContext(optionsBuilder.Options);
 
-// Pour SQLite InMemory : ouvrir la connexion et créer la base
+// Crée le schéma de la base de données (nécessaire si aucune migration n'est appliquée)
+// Note : Pour SQLite In-Memory, la connexion doit rester ouverte pour que la BD persiste
 await context.Database.OpenConnectionAsync();
 await context.Database.EnsureCreatedAsync();
 
-// Seed
+// Initialisation des données de test
+// Attention : Sur une base de données persistante, ce code dupliquerait les données à chaque exécution
 await BlogSeeder.SeedAsync(context);
 
 await RunDemo(BasicOperationsDemo.RunAsync);

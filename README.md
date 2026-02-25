@@ -1,10 +1,15 @@
-# Entity Framework Core - Projet de Démonstration
+# BlogDemo - Projet de Démonstration
+
+![.NET](https://img.shields.io/badge/.NET-10.0-512BD4)
+![EF Core](https://img.shields.io/badge/EF%20Core-10.0.2-512BD4)
+![Status](https://img.shields.io/badge/Status-Demo-success)
 
 > Projet pédagogique couvrant les concepts fondamentaux d'EF Core à travers des démonstrations pratiques et progressives.
 
 ## Table des matières
 
 - [Aperçu](#aperçu)
+- [Modèle de Domaine](#modèle-de-domaine)
 - [Parcours pédagogique](#parcours-pédagogique)
 - [Démonstrations](#démonstrations)
 - [Cheatsheets](#cheatsheets)
@@ -24,6 +29,18 @@ Ce projet démontre les concepts essentiels d'Entity Framework Core à travers u
 
 ---
 
+## Modèle de Domaine
+
+Ce projet utilise un modèle de domaine simple mais riche en relations pour illustrer les concepts.
+
+| Entité | Description | Relations |
+|--------|-------------|-----------|
+| **Author** | L'auteur des articles. Aggregate Root. | 1-N avec **Article** |
+| **Article** | Le contenu principal du blog. Aggregate Root. | N-1 avec **Author**, 1-N avec **Comment**, N-N avec **Tag** |
+| **Comment** | Les commentaires des lecteurs. Entité enfant. | N-1 avec **Article** |
+| **Tag** | Les étiquettes pour catégoriser les articles. Indépendant. | N-N avec **Article** |
+
+---
 ## Parcours pédagogique
 
 ### Progression recommandée

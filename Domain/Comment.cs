@@ -24,6 +24,8 @@ public class Comment {
     // === FACTORY METHOD (INTERNE) ===
     // [DDD] Utilisé uniquement par l'aggregate root Article
     internal static Comment CreateInternal(string content, Guid articleId) {
+        ArgumentOutOfRangeException.ThrowIfEqual(articleId, Guid.Empty);
+
         return new Comment {
             Id = Guid.NewGuid(),
             Content = content,
